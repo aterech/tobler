@@ -131,32 +131,4 @@ def percent_weighting(
     # Returning result
     return result
 
-
-    # Steps I want to take for n-class
-    # Split the dictionary to key, value
-    # Use the assigned weightings to indicate how much of the population column will be applied to the values
-    # Example: 1, residential area, is 75% weighting. 75% of the column will be applied to ancillary polygons
-    # How would this be done? 
-    # Create a new field holding the weighting ('percent' does that so that's good)
-    # A part of me thinks there should be a part of this code that takes the area of a polygon into consideration
-    # Especially if the ancillary polygons are much smaller than the source polygons
-    # So I'm kind of thinking density in this instance, so it might acquire the overall density of the source df,
-    # and then use the average density to apply a value for each specific polygon based on that polygon's area
-
-    # So then how would this look? What columns would be needed:
-    # geometries of both source and ancillary dfs
-    # key, values from the dictionary
-    # population field from source df
-    # class field from ancillary df
-    
-    # Actual steps:
-    # Calculate geometries of polygons from both dfs
-    # Split the dictionary to keys, values; create new field 'weighting' in the process
-    # Calculate the density of the pop column by source polygon level using area and population
-    # Allocate a percentage of the total population within each polygon by the specified weighting
-    # Split the pop data further by taking ancillary df area into consideration
-    # Calculate the sum of the area by each assigned value (sum of residential, commercial, and industrial for example)
-    # The pop values from each weighting will then be allocated based on area
-    # Basically, large residential polygons will have more population than smaller residential polygons
-
     
