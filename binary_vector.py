@@ -1,11 +1,8 @@
 import warnings
 import sys
 import geopandas as gpd
-from update.area_weighted import area_interpolate
 
 __all__ = ["binary_vector"]
-
-
 
 def binary_vector(
     source_df,
@@ -14,26 +11,29 @@ def binary_vector(
     exclusion_column=None,
     exclusion_values=None,
 ):
-    """Interpolate data between two vector datasets using a third dataset that functions as an ancillary mask.
-    Fields and values from the ancillary dataset can be used to determine the extent of the mask.
+    """Interpolates data within a source dataframe by overlaying it within an ancillary dataframe and excluding
+    overlapping areas from final result. Fields and values from the ancillary dataset can be used to 
+    determine the extent of the exclusion zone.
 
     Parameters
     ----------
     source_df : geopandas.GeoDataFrame
-        source data to be converted to another geometric representation.
+        Source data used that will be impacted by the exclusion zone.
     ancillary_df : geopandas.GeoDataFrame
-        ancillary data used to mask the source data. Ancillary dataframe can be the same as the target dataframe.
-    mask_field : list
-        [Optional. Default=None] Column from the ancillary data that will be used to determine mask extent.
-        If no column is specified, the entire dataset will be used as a mask.
-    mask_values : list of int
-        [Optional. Default=None] Values from the exclusion field that will be used for the mask.
+        Ancillary data used to construct the exclusion zone for the source_df.
+    population_columns : list of str
+        Columns from the source dataframe that will contain population data. Multiple columns can be specified.
+    exclusion_column : str
+        [Optional. Default=None] Column that can be used to construct a specific mask. If no column is specified, the entire
+        ancillary dataframe will be used as a mask.
+    exclusion_values : list of int
+        [Optional. Default=None] Values from exclusion column that will be used to construct the mask. If no values are specified,
+        the entire ancillary dataframe will be used as a mask.
 
     Returns
     -------
     geopandas.GeoDataFrame
-        GeoDataFrame with geometries matching the target_df and extensive and intensive
-        variables as the columns
+        GeoDataFrame with geometries matching the source_df, alongside the exclusion_column from ancillary_df
 
     """
     
@@ -67,23 +67,20 @@ def binary_vector(
     # Dissolving polygons part of the exclusion zone into 1 polygon
     exclusion_zone = exclusion_zone.dissolve()
 
+    # Erasing parts that intersect with the exclusion zone
+    source = gpd.overlay(source,exclusion_zone,how='difference')
+
     #  Using union overlay to split areas with zero population away from the source df polygons
     zero_population = source.overlay(exclusion_zone,how='union')
-
-    # Converting columns into strings if they are a tuple or object
-    #if isinstance(zero_population[exclusion_column],str) == False: 
-    #    zero_population[exclusion_column] = zero_population[exclusion_column].astype(str)
-    
-    #if isinstance(source_df[population_columns],str) == False:
-    #    source_df[population_columns] = source_df[population_columns].astype(str)
 
     # Defining area of zero_population shapefile for final result output
     zero_population['area'] = zero_population.geometry.area
 
-    # Setting population to zero in areas part of exclusion zone
-    zero_population.loc[zero_population[exclusion_column].isin(exclusion_values), population_columns] = 0
+    if exclusion_column is not None:
+        # Setting population to zero in areas part of exclusion zone
+        zero_population.loc[zero_population[exclusion_column].isin(exclusion_values), population_columns] = 0
 
     # Creating final dataset and defining columns present
-    binary_result = zero_population[[population_columns, 'area']]
+    binary_result = zero_population
 
     return binary_result
