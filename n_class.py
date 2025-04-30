@@ -1,8 +1,6 @@
 import warnings
 import sys
 import geopandas as gpd
-import pandas as pd
-from update.area_weighted import area_interpolate
 
 __all__ = ['percent_weighting']
 
@@ -13,51 +11,29 @@ def percent_weighting(
         percent_values,
         population_field,
         dissolve=True,
-        weighting=1,
 ):
     """Interpolates data from a source dataframe using a class-weighted method. Each class is given a certain weighting
-    that equals to 100% when combined. Areal interpolation can be completed if a target dataframe is specified.
+    that equals up to 100% when combined, which is used to redistribute population data based on the weighting attributes. 
 
     Parameters
     ----------
     source_df : geopandas.GeoDataFrame
-        source data to be converted to another geometric representation.
+        Source dataframe containing population data.
     ancillary_df : geopandas.GeoDataFrame
-        ancillary data used to mask the source data. Ancillary dataframe can be the same as the target dataframe.
-    percent_field : list
+        Ancillary dataframe containing field where weighting values will be used to reallocate data.
+    percent_field : str
         Column from the ancillary dataframe that will be used to collect reclassified values.
-    percent_values : list of int
-        Values that will 
-    target_df : geopandas.GeoDataFrame
-        target geometries that will form the new representation of the input data (default will be None)
-    erase_ancillary : bool
-        Determines whether the ancillary dataframe will be used to remove sections that overlap with the source
-        dataframe, or if it'll be used to only include overlapping sections. (default is True, which will erase
-        overlapping sections)
-    mask_field : list
-        [Optional. Default=None] Column from the ancillary data that will be used to determine mask extent.
-        If no column is specified, the entire dataset will be used as a mask.
-    mask_values : list of int
-        [Optional. Default=None] Values from the exclusion field that will be used for the mask.
-    extensive_variables : list
-        Columns of the input dataframe containing extensive variables to interpolate
-    intensive_variables : list
-        Columns of the input dataframe containing intensive variables to interpolate
-    categorical_variables : list
-        [Optional. Default=None] Columns in dataframes for categorical variables
-    allocate_total : bool
-        whether to allocate the total from the source geometries (the default is True).
-    n_jobs : int
-        [Optional. Default=-1] Number of processes to run in parallel to
-        generate the area allocation. If -1, this is set to the number of CPUs
-        available.
-    parameters be set as a dictionary
-
+    percent_values : dict
+        Values that will be contained in a dictionary, with the key referring to the variables within the percent field,
+        and the value referring to the weighting percentage  
+    population_field : str 
+        Field that contains the population values from the source dataframe. Only one population field can currently be run in a function.
+    dissolve : bool
+        [Default=True] A boolean parameter that determines whether ancillary polygon boundaries will be dissolved. The default option dissolves the boundaries.
     Returns
     -------
     geopandas.GeoDataFrame
-        GeoDataFrame with geometries matching the target_df and extensive and intensive
-        variables as the columns
+        GeoDataFrame with source_df geometries and reallocated population data
 
     """
 
@@ -75,14 +51,14 @@ def percent_weighting(
         warnings.warn('Geographic CRS detected. Ensure all dataframes are in a projected CRS before continuing. Exiting...', RuntimeWarning)
     
     # Takes value from dictionary to determine total value of weighting
-    #for value in percent_values.items():
-    #    total_value = 0
-    #    value.append(total_value)
+    total_value = 0
+    for key, value in percent_values.items():
+        total_value = total_value + value
     
-    # If weighting is greater than 1, error is returned and code exits
-    if value > 1:
-        warnings.warn('Weighting exceeds 1. Check percent_values to ensure the weighting equals 1 or is less than 1. Exiting...', RuntimeWarning)
-        return None
+        # If weighting is greater than 1, error is returned and code exits
+        if total_value > 1:
+            warnings.warn('Weighting exceeds 1. Check percent_values to ensure the weighting equals 1 or is less than 1. Exiting...', RuntimeWarning)
+            return None
     
     # Creating copies of shapefiles
     source = source_df.copy()
@@ -96,39 +72,104 @@ def percent_weighting(
     for key, value in percent_values.items():
         ancillary.loc[ancillary[percent_field]== key, 'weighting']=value
         print(f'Value: {key}, Weight: {value}')
-    
-    # Ensuring that population field is integer before proceeding
-    #if isinstance(population_field,int) == False:
-    #    population_field = source[population_field].astype(int)
 
+    # Unallocated value is determined by subtracting 1 and the total value
+    unallocated = 1 - total_value
+    unallocated_value = round(unallocated,2)
+
+    # Assigns the unallocated value to remaining rows
+    ancillary.loc[ancillary['weighting'].isna(), 'weighting']=unallocated_value
+
+    # This section of code runs if dissolve option is false
+    if dissolve == False:
+        ancillary_no_dissolve = ancillary.dissolve(by=percent_field)
+
+        # Intersecting the source and ancillary dataframes
+        no_dissolve = gpd.overlay(source,ancillary_no_dissolve,how='intersection')
+        intersect = gpd.overlay(source,ancillary,how='intersection')
+
+        # Defining new column 'class_area' to contain area of each matching value
+        no_dissolve['class_area'] = no_dissolve.geometry.area
+
+        # Setting up apply function to allocate data from 'class_area' column to the correct polygons
+        intersect['class_area'] = intersect.apply(lambda x: no_dissolve[no_dissolve.geometry.contains(x.geometry)]['class_area'].iloc[0] if not no_dissolve[no_dissolve.contains(x.geometry)].empty else None, axis=1)
+
+        # If weighting from dictionary doesn't add up to 1, remaining data will be allocated to polygons outside the dictionary
+        if total_value != 1:
+            # Creating unallocated zone to only include unallocated polygons
+            unallocated_zone = no_dissolve[no_dissolve.apply(lambda x: x['weighting'] == unallocated_value, axis=1)]
+            unallocated_area = unallocated_zone.dissolve()
+            total = gpd.overlay(source,unallocated_area,how='intersection')
+
+            # Defining class_area based on the area of unallocated polygons 
+            total['class_area'] = total.geometry.area
+
+            intersect['class_area'] = intersect.apply(lambda x: total[total.geometry.contains(x.geometry)]['class_area'].iloc[0] if x['weighting'] == unallocated_value and not total[total.geometry.contains(x.geometry)].empty else x['class_area'], axis=1)
+
+        # Defining another new column 'area' to contain area of each separate polygon 
+        intersect['area'] = intersect.geometry.area
+
+        # Defining the population within a specified class by population field and weighting
+        intersect['class_pop'] = intersect[population_field] * intersect['weighting']
+
+        # Dividing the area by the class area to determine percentage the polygon constitutes of total area
+        intersect['percent'] = intersect['area'] / intersect['class_area']
+
+        # Multiplying class population by the percentage to determine the total population
+        intersect['total_pop'] = intersect['class_pop'] * intersect['percent']
+
+        # Defining ancillary df as result to return the final results
+        result = intersect
+
+        # Returning result
+        return result
+
+    # If dissolve option is true, this section of code runs
     if dissolve == True:
         ancillary = ancillary.dissolve(by=percent_field)
 
-    # Intersecting the source and ancillary dataframes
-    intersect = gpd.overlay(source,ancillary,how='intersection')
+        # Intersecting the source and ancillary dataframes
+        intersect = gpd.overlay(source,ancillary,how='intersection')
 
-    # Defining the population within a specified class by population field and weighting
-    intersect['class_pop'] = intersect[population_field] * intersect['weighting'] / weighting
+        # Defining new column 'class_area' to contain area of each matching value
+        intersect['class_area'] = intersect.geometry.area
 
-    # Defining new column 'class_area' to contain area of each matching value
-    intersect['class_area'] = intersect.geometry.area
+        # Exploding multi polygons within dataset to single polygons
+        intersect = intersect.explode()
 
-    # Exploding multi polygons within dataset to single polygons
-    intersect = intersect.explode()
+        # If weighting from dictionary doesn't add up to 1, remaining data will be allocated to polygons outside the dictionary
+        if total_value != 1:
+            # Creating unallocated zone to only include unallocated polygons
+            unallocated_zone = intersect[intersect.apply(lambda x: x['weighting'] == unallocated_value, axis=1)]
+            unallocated_area = unallocated_zone.dissolve()
+            total = gpd.overlay(source,unallocated_area,how='intersection')
 
-    # Defining another new column 'area' to contain area of each separate polygon 
-    intersect['area'] = intersect.geometry.area
+            # Defining class_area based on the area of unallocated polygons 
+            total['class_area'] = total.geometry.area
 
-    # Dividing the area by the class area to determine percentage the polygon constitutes of total area
-    intersect['percent'] = intersect['area'] / intersect['class_area']
+            # Use lambda function to assign class_area to rows containing the unallocated value
+            intersect['class_area'] = intersect.apply(lambda x: total[total.geometry.contains(x.geometry)]['class_area'].iloc[0] if x['weighting'] == unallocated_value and not total[total.geometry.contains(x.geometry)].empty else x['class_area'], axis=1)
 
-    # Multiplying class population by the percentage to determine the total population
-    intersect['total_pop'] = intersect['class_pop'] * intersect['percent']
+        # Defining another new column 'area' to contain area of each separate polygon 
+        intersect['area'] = intersect.geometry.area
 
-    # Defining ancillary df as result to return the final results
-    result = intersect[[percent_field,'weighting','class_pop','total_pop',]]
+        # Defining the population within a specified class by population field and weighting
+        intersect['class_pop'] = intersect[population_field] * intersect['weighting']
 
-    # Returning result
-    return result
+        # Rounding values from 'class_pop' to whole numbers
+        intersect['class_pop'] = intersect['class_pop'].round()
 
-    
+        # Dividing the area by the class area to determine percentage the polygon constitutes of total area
+        intersect['percent'] = intersect['area'] / intersect['class_area']
+
+        # Multiplying class population by the percentage to determine the total population
+        intersect['total_pop'] = intersect['class_pop'] * intersect['percent']
+
+        # Rounding the population column to hundredths
+        intersect['total_pop'] = intersect['total_pop'].round(2)
+
+        # Defining ancillary df as result to return the final results
+        result = intersect
+
+        # Returning result
+        return result
