@@ -43,7 +43,7 @@ If the entire ancillary df is used as an exclusion zone, exclusion_column and ex
 
 ## Limiting variable
 ```
-result = 
+result = limit_variable(source_df=census,ancillary_df=land_use,aclass="C_DIG1",dclass={1:100,2:50,3:50},cols_intp="Population")
 ```
 
 ## N-Class method
