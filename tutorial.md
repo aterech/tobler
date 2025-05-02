@@ -53,7 +53,7 @@ for ax in ax:
 fig.suptitle("Population Distribution (Binary Method)")
 plt.show()
 ```
-![BINARY_RESULTS](images/binary_results.png)
+![BINARY_RESULTS](images/binary_vector_results.png)
 
 ## Limiting variable
 ```
