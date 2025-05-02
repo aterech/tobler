@@ -30,7 +30,6 @@ land_use = gpd.read_file("Land_Use_South/Land_Use_South.shp).to_crs(crs)
 The first function is the binary method, referred to as binary_vector within the Tobler package. This method takes 2 vector shapefiles (a source dataframe and ancillary dataframe), using the latter shapefile as an exclusion zone to remove sections of the source dataframe that overlap with the exclusion zone. Polygons within an exclusion zone will revert their population fields to zero, with polygons located outside maintaining their population data. This method is particularly useful when trying to remove population data from certain land uses including water, transportation, or undeveloped polygons. 
 
 In the binary_vector function, the exclusion zone can be constructed in 2 different ways. The first approach is to use the entire ancillary dataframe as an exclusion zone, removing any soource polygons that overlap with the exclusion zone. Another approach allows the user to construct an exclusion zone using certain parts of the ancillary dataframe instead of the entire dataset. This approach can be helpful in cases where numerous types of land use patterns are contained within a dataframe.
-
 ```
 result = binary_vector(source_df=census,ancillary_df=land_use,population_columns="Population",exclusion_column="C_DIG1",exclusion_values=[5,7,8])
 ```
@@ -39,6 +38,21 @@ The code above is an example of how the user can utilize the binary_vector funct
 The final 2 parameters are dedicated for constructing the exclusion zone. The exclusion column parameter asks for a column within the ancillary dataframe, observing which rows within the exclusion column contain a specified exclusion value. The specified values withi exclusion_values will be used to construct the exclusion zone. In this example, we utilized "C_DIG1", a column containing the land use classes within Philadelphia, as our exclusion column. Values 5, 7, and 8 (Which represent transportation, water, and park polygons respectively) are used as exclusion values. 
 
 If the entire ancillary df is used as an exclusion zone, exclusion_column and exclusion_values are optional and shouldn't be used. 
+
+After running the function, we can display the results on matplot:
+```
+fig, ax = plt.subplots(1,2, figsize=(14,7))
+
+results.plot("Population",scheme="natural_breaks",cmap="Reds", ax=ax[0])
+census.plot("Population",scheme="natural_breaks",cmap="Reds", ax=ax[1])
+
+ax[0].set_title("Binary Method Allocation")
+ax[1].set_title('Census Tract Population')
+for ax in ax:
+    ax.axis('off')
+fig.suptitle("Population Distribution (Binary Method)")
+plt.show()
+```
 
 
 ## Limiting variable
@@ -53,3 +67,17 @@ The third and final function is based on the n-class method, known as percent_we
 result = percent_weighting(source_df=census,ancillary_df=land_use,percent_field="C_DIG1",percent_values={1:0.85,2:0.15,5:0,7:0,8:0},population_field="Population")
 ```
 In the above example, the assigned dictionary will allocate 85% of population data within each census tract to residential polygons, 15% to commercial polygons, and allocate zero population to transportation, park, and water polygons. With this dictionary, only 90% of the population data is assigned and the remaining 10% will be allocated to other polygons. In addition, a boolean parameter called "dissolve" is also utilized to determine whether neighboring polygons of the same value should be dissolved into 1 polygon. The option is set to True by default, and doesn't need to be specified unless the user wants to prevent the polygons from dissolving.
+
+```
+fig, ax = plt.subplots(1,2, figsize=(14,7))
+
+results.plot("total_pop",scheme="natural_breaks",cmap="Reds", ax=ax[0])
+census.plot(scheme="natural_breaks",cmap="Reds", ax=ax[1])
+
+ax[0].set_title("N-Class Method Allocation")
+ax[1].set_title('Census Tract Population')
+for ax in ax:
+    ax.axis('off')
+fig.suptitle("Population Distribution (N-Class Method)")
+plt.show()
+```
