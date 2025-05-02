@@ -81,3 +81,4 @@ for ax in ax:
 fig.suptitle("Population Distribution (N-Class Method)")
 plt.show()
 ```
+![N_CLASS](n_class_results.png) 
