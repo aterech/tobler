@@ -7,7 +7,7 @@ This tutorial will cover 3 new functions added to the tobler package and can be 
 
 ## Importing extensions and shapefiles
 
-Let's suppose that we want to determine population distributon within a specific portion of the city of Philadelphia. We can do this with each of the 3 dasymetric functions. First, let's import all the needed extensions for this tutorial.
+Let's suppose that we want to determine population distribution within a specific portion of the city of Philadelphia. We can do this with each of the 3 dasymetric functions. First, let's import all the needed extensions for this tutorial.
 
 ### Extensions
 ``` 
