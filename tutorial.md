@@ -1,4 +1,4 @@
-### Overview of Tobler's New Dasymetric Functions
+# Overview of Tobler's New Dasymetric Functions
 
 This tutorial will cover 3 new functions added to the tobler package and can be accessed under tobler.dasymetric. The 3 functions are:
 - binary_vector
@@ -9,7 +9,7 @@ This tutorial will cover 3 new functions added to the tobler package and can be 
 
 Let's suppose that we want to determine population distributon within a specific portion of the city of Philadelphia. We can do this with each of the 3 dasymetric functions. First, let's import all the needed extensions for this tutorial.
 
-# Extensions
+### Extensions
 ``` 
 import geopandas as gpd
 import matplotlib.pyplot as plt
@@ -18,7 +18,7 @@ from tobler.dasymetric import binary_vector, limit_variable, percent_weighting
 
 After importing all of our needed extensions, we can also import our shapefiles: Census_South and Land_Use_South. In the meantime, let's also set both shapefiles to the same CRS to the study area. Note that all 3 functions will trigger warnings if any input shapefiles don't have matching CRS.
 
-# Shapefiles
+### Shapefiles
 ```
 census = gpd.read_file("Census_South/Census_South.shp").to_crs(crs)
 land_use = gpd.read_file("Land_Use_South/Land_Use_South.shp).to_crs(crs)
