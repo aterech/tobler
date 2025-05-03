@@ -39,9 +39,9 @@ In the binary_vector function, the exclusion zone can be constructed in 2 differ
 overlap with the exclusion zone. Another approach allows the user to construct an exclusion zone using certain parts of the ancillary dataframe instead of the entire dataset. This approach can be helpful in 
 cases where numerous types of land use patterns are contained within a dataframe.
 
-.. code-block:: python
-
+```
     result = binary_vector(source_df=census,ancillary_df=land_use,population_columns="Population",exclusion_column="C_DIG1",exclusion_values=[5,7,8])
+```
 
 The code above is an example of how the user can utilize the binary_vector function. In the example, our census tract shapefile is used as the source dataframe, with our land use shapefile being used as the 
 ancillary dataframe. The population column used is a column named "Population" that is located within the census tract shapefile. Population columns should be derived from the source dataframe, and multiple 
